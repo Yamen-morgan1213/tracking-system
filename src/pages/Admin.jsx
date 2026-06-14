@@ -17,7 +17,9 @@ import {
   Lock,
   LogOut,
   Eye,
-  EyeOff
+  EyeOff,
+  Bell,
+  BellOff
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
@@ -51,6 +53,49 @@ export default function Admin() {
   const [deletePlayer, setDeletePlayer] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    return localStorage.getItem('admin_notifications') === 'true' && 
+      'Notification' in window && 
+      Notification.permission === 'granted'
+  })
+
+  const notificationsEnabledRef = React.useRef(notificationsEnabled)
+
+  useEffect(() => {
+    notificationsEnabledRef.current = notificationsEnabled
+  }, [notificationsEnabled])
+
+  const toggleNotifications = async () => {
+    if (notificationsEnabled) {
+      localStorage.setItem('admin_notifications', 'false')
+      setNotificationsEnabled(false)
+      toast.success('Browser notifications disabled.')
+    } else {
+      if (!('Notification' in window)) {
+        toast.error('This browser does not support desktop notifications.')
+        return
+      }
+
+      try {
+        const permission = await Notification.requestPermission()
+        if (permission === 'granted') {
+          localStorage.setItem('admin_notifications', 'true')
+          setNotificationsEnabled(true)
+          toast.success('Browser notifications enabled!')
+          new Notification('Muhammad El-Sayed Attendance', {
+            body: 'Real-time notifications are active.',
+            icon: '/favicon.svg'
+          })
+        } else {
+          toast.error('Permission denied for notifications.')
+        }
+      } catch (err) {
+        console.error('Error requesting notification permission:', err)
+        toast.error('Could not enable notifications.')
+      }
+    }
+  }
+
   const handlePinSubmit = (e) => {
     e.preventDefault()
     if (pin === '23001') {
@@ -78,11 +123,32 @@ export default function Admin() {
         { event: '*', schema: 'public', table: 'players' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
+            if (notificationsEnabledRef.current) {
+              try {
+                new Notification('New Athlete Registered', {
+                  body: `${payload.new.name} has registered under passcode ${payload.new.passcode}.`,
+                  icon: '/favicon.svg'
+                })
+              } catch (e) {
+                console.warn('Notification failed:', e)
+              }
+            }
             setPlayers((prev) => {
               if (prev.some((p) => p.id === payload.new.id)) return prev
               return [...prev, payload.new].sort((a, b) => a.name.localeCompare(b.name))
             })
           } else if (payload.eventType === 'UPDATE') {
+            const isCheckIn = payload.new.last_login && (payload.new.last_login !== payload.old.last_login)
+            if (isCheckIn && notificationsEnabledRef.current) {
+              try {
+                new Notification('Attendance Check-In', {
+                  body: `${payload.new.name} has checked in! (Session ${payload.new.sessions_count}/30)`,
+                  icon: '/favicon.svg'
+                })
+              } catch (e) {
+                console.warn('Notification failed:', e)
+              }
+            }
             setPlayers((prev) =>
               prev.map((p) => (p.id === payload.new.id ? payload.new : p))
             )
@@ -362,7 +428,18 @@ export default function Admin() {
             Attendance Command Center • Live Monitoring Active
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={toggleNotifications}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold tracking-wide uppercase border rounded-xl transition duration-200 cursor-pointer ${
+              notificationsEnabled
+                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30 animate-pulse-slow'
+                : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'
+            }`}
+          >
+            {notificationsEnabled ? <Bell size={13} className="animate-bounce" /> : <BellOff size={13} />}
+            {notificationsEnabled ? 'Notifications Active' : 'Enable Notifications'}
+          </button>
           <a
             href="/player"
             target="_blank"
