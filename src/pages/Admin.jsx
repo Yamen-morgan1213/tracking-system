@@ -54,10 +54,16 @@ export default function Admin() {
   const [deleting, setDeleting] = useState(false)
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
-    return localStorage.getItem('admin_notifications') === 'true' && 
-      'Notification' in window && 
-      Notification.permission === 'granted'
+    try {
+      return localStorage.getItem('admin_notifications') === 'true' && 
+        typeof window !== 'undefined' &&
+        'Notification' in window && 
+        Notification.permission === 'granted'
+    } catch {
+      return false
+    }
   })
+  const [notifLoading, setNotifLoading] = useState(false)
 
   const notificationsEnabledRef = React.useRef(notificationsEnabled)
 
@@ -66,33 +72,54 @@ export default function Admin() {
   }, [notificationsEnabled])
 
   const toggleNotifications = async () => {
-    if (notificationsEnabled) {
-      localStorage.setItem('admin_notifications', 'false')
-      setNotificationsEnabled(false)
-      toast.success('Browser notifications disabled.')
-    } else {
-      if (!('Notification' in window)) {
-        toast.error('This browser does not support desktop notifications.')
+    if (notifLoading) return
+    setNotifLoading(true)
+
+    try {
+      if (notificationsEnabled) {
+        localStorage.setItem('admin_notifications', 'false')
+        setNotificationsEnabled(false)
+        toast.success('Browser notifications disabled.')
+        setNotifLoading(false)
         return
       }
 
-      try {
-        const permission = await Notification.requestPermission()
-        if (permission === 'granted') {
-          localStorage.setItem('admin_notifications', 'true')
-          setNotificationsEnabled(true)
-          toast.success('Browser notifications enabled!')
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        toast.error('This browser does not support desktop notifications.')
+        setNotifLoading(false)
+        return
+      }
+
+      let permission = Notification.permission
+
+      if (permission === 'denied') {
+        toast.error('Notifications are blocked. Please allow them in your browser settings.')
+        setNotifLoading(false)
+        return
+      }
+
+      if (permission !== 'granted') {
+        permission = await Notification.requestPermission()
+      }
+
+      if (permission === 'granted') {
+        localStorage.setItem('admin_notifications', 'true')
+        setNotificationsEnabled(true)
+        toast.success('Browser notifications enabled!')
+        try {
           new Notification('Muhammad El-Sayed Attendance', {
-            body: 'Real-time notifications are active.',
+            body: 'Real-time notifications are now active.',
             icon: '/favicon.svg'
           })
-        } else {
-          toast.error('Permission denied for notifications.')
-        }
-      } catch (err) {
-        console.error('Error requesting notification permission:', err)
-        toast.error('Could not enable notifications.')
+        } catch (_) { /* ignore */ }
+      } else {
+        toast.error('Notification permission was not granted.')
       }
+    } catch (err) {
+      console.warn('Notification toggle error:', err)
+      toast.error('Could not toggle notifications.')
+    } finally {
+      setNotifLoading(false)
     }
   }
 
@@ -138,7 +165,8 @@ export default function Admin() {
               return [...prev, payload.new].sort((a, b) => a.name.localeCompare(b.name))
             })
           } else if (payload.eventType === 'UPDATE') {
-            const isCheckIn = payload.new.last_login && (payload.new.last_login !== payload.old.last_login)
+            const oldLogin = payload.old ? payload.old.last_login : null
+            const isCheckIn = payload.new.last_login && (payload.new.last_login !== oldLogin)
             if (isCheckIn && notificationsEnabledRef.current) {
               try {
                 new Notification('Attendance Check-In', {
@@ -431,14 +459,21 @@ export default function Admin() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={toggleNotifications}
-            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold tracking-wide uppercase border rounded-xl transition duration-200 cursor-pointer ${
+            disabled={notifLoading}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold tracking-wide uppercase border rounded-xl transition duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
               notificationsEnabled
-                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30 animate-pulse-slow'
+                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/30'
                 : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'
             }`}
           >
-            {notificationsEnabled ? <Bell size={13} className="animate-bounce" /> : <BellOff size={13} />}
-            {notificationsEnabled ? 'Notifications Active' : 'Enable Notifications'}
+            {notifLoading ? (
+              <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : notificationsEnabled ? (
+              <Bell size={13} />
+            ) : (
+              <BellOff size={13} />
+            )}
+            {notifLoading ? 'Processing...' : notificationsEnabled ? 'Notifications Active' : 'Enable Notifications'}
           </button>
           <a
             href="/player"
