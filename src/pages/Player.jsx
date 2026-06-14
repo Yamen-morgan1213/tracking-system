@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   KeyRound, 
@@ -15,16 +15,25 @@ export default function Player() {
   const [submitting, setSubmitting] = useState(false)
   const [successPlayer, setSuccessPlayer] = useState(null)
   const [particles, setParticles] = useState([])
+  const inputRef = useRef(null)
+
+  // Auto-focus passcode input on load and when closing success modal
+  useEffect(() => {
+    if (!successPlayer && inputRef.current) {
+      inputRef.current.focus()
+    }
+  }, [successPlayer])
 
   const triggerConfetti = () => {
-    const newParticles = Array.from({ length: 50 }).map((_, i) => ({
+    const newParticles = Array.from({ length: 80 }).map((_, i) => ({
       id: i,
-      x: 0,
-      y: 0,
-      angle: Math.random() * Math.PI * 2,
-      velocity: Math.random() * 10 + 5,
-      color: ['#10b981', '#06b6d4', '#6366f1', '#f59e0b', '#ec4899'][Math.floor(Math.random() * 5)],
-      size: Math.random() * 8 + 4
+      angle: (Math.PI * 1.15) + (Math.random() * Math.PI * 0.7), // Fountain shooting upwards
+      velocity: Math.random() * 9 + 5,
+      color: ['#10b981', '#06b6d4', '#6366f1', '#f59e0b', '#ec4899', '#f43f5e'][Math.floor(Math.random() * 6)],
+      size: Math.random() * 9 + 5,
+      shape: Math.random() > 0.5 ? 'circle' : 'square',
+      spinSpeed: Math.random() * 4 - 2,
+      duration: Math.random() * 0.8 + 1.2
     }))
     setParticles(newParticles)
   }
@@ -146,6 +155,7 @@ export default function Player() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <input
+                ref={inputRef}
                 type="text"
                 value={passcode}
                 onChange={handleInputChange}
@@ -182,21 +192,26 @@ export default function Player() {
               {particles.map((p) => (
                 <motion.div
                   key={p.id}
-                  className="absolute rounded-full"
+                  className="absolute"
                   style={{
                     backgroundColor: p.color,
                     width: p.size,
-                    height: p.size,
+                    height: p.shape === 'circle' ? p.size : p.size * 0.6,
+                    borderRadius: p.shape === 'circle' ? '50%' : '2px',
                     left: '50%',
-                    top: '50%'
+                    top: '40%'
                   }}
                   animate={{
-                    x: Math.cos(p.angle) * p.velocity * 40,
-                    y: Math.sin(p.angle) * p.velocity * 40 + 200,
-                    opacity: 0,
-                    scale: 0
+                    x: [0, Math.cos(p.angle) * p.velocity * 25, Math.cos(p.angle) * p.velocity * 35],
+                    y: [0, Math.sin(p.angle) * p.velocity * 25 - 150, Math.sin(p.angle) * p.velocity * 35 + 350],
+                    rotate: [0, p.spinSpeed * 180, p.spinSpeed * 360],
+                    opacity: [1, 1, 0],
+                    scale: [1, 1.2, 0.4]
                   }}
-                  transition={{ duration: 1.5, ease: 'easeOut' }}
+                  transition={{ 
+                    duration: p.duration, 
+                    ease: 'easeOut'
+                  }}
                 />
               ))}
             </div>

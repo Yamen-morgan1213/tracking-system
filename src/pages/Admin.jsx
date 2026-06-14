@@ -15,7 +15,9 @@ import {
   Flame,
   UserPlus,
   Lock,
-  LogOut
+  LogOut,
+  Eye,
+  EyeOff
 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { supabase } from '../lib/supabase'
@@ -28,6 +30,11 @@ export default function Admin() {
   const [pinError, setPinError] = useState(false)
 
   const [players, setPlayers] = useState([])
+  const [visiblePasscodes, setVisiblePasscodes] = useState({})
+
+  const togglePasscodeVisibility = (id) => {
+    setVisiblePasscodes((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
   const [loading, setLoading] = useState(true)
   const [newPlayerName, setNewPlayerName] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
@@ -489,9 +496,32 @@ export default function Admin() {
         </div>
 
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-10 h-10 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-            <p className="text-gray-400 text-sm mt-4">Streaming database records...</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="glass-card rounded-2xl p-6 relative flex flex-col justify-between animate-pulse">
+                <div>
+                  <div className="flex justify-between items-start">
+                    <div className="h-6 w-1/2 bg-white/10 rounded-lg"></div>
+                    <div className="h-5 w-16 bg-white/5 rounded-full"></div>
+                  </div>
+                  <div className="h-8 w-24 bg-white/5 rounded-lg mt-4"></div>
+                  <div className="mt-6">
+                    <div className="flex justify-between mb-1.5">
+                      <div className="h-3 w-1/3 bg-white/5 rounded"></div>
+                      <div className="h-3 w-8 bg-white/5 rounded"></div>
+                    </div>
+                    <div className="w-full bg-white/5 rounded-full h-2"></div>
+                  </div>
+                </div>
+                <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between">
+                  <div className="h-4 w-1/3 bg-white/5 rounded"></div>
+                  <div className="flex gap-2">
+                    <div className="h-8 w-8 bg-white/5 rounded-lg"></div>
+                    <div className="h-8 w-8 bg-white/5 rounded-lg"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredPlayers.length === 0 ? (
           <div className="glass-panel rounded-2xl p-12 text-center border border-white/5">
@@ -515,10 +545,11 @@ export default function Admin() {
                     initial={{ opacity: 0, y: 15 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.25 }}
-                    className={`glass-card rounded-2xl p-6 relative flex flex-col justify-between ${
+                    whileHover={{ y: -4, scale: 1.015 }}
+                    transition={{ duration: 0.2 }}
+                    className={`glass-card rounded-2xl p-6 relative flex flex-col justify-between cursor-default ${
                       active 
-                        ? 'ring-1 ring-green-500 shadow-[0_0_15px_rgba(34,197,94,0.15)] bg-emerald-950/5' 
+                        ? 'ring-1 ring-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.15)] bg-emerald-950/5' 
                         : ''
                     }`}
                   >
@@ -547,9 +578,19 @@ export default function Admin() {
 
                       {/* Passcode Copy area */}
                       <div className="flex items-center gap-2 mt-2 bg-black/30 w-fit px-3 py-1.5 rounded-lg border border-white/5">
-                        <Key size={13} className="text-gray-500" />
+                        <button
+                          onClick={() => togglePasscodeVisibility(player.id)}
+                          className="text-gray-400 hover:text-emerald-400 transition cursor-pointer"
+                          title={visiblePasscodes[player.id] ? "Hide Passcode" : "Show Passcode"}
+                        >
+                          {visiblePasscodes[player.id] ? (
+                            <EyeOff size={13} />
+                          ) : (
+                            <Eye size={13} />
+                          )}
+                        </button>
                         <span className="text-xs font-mono tracking-widest text-emerald-400 font-bold uppercase">
-                          {player.passcode}
+                          {visiblePasscodes[player.id] ? player.passcode : '•••••'}
                         </span>
                         <button
                           onClick={() => handleCopyPasscode(player.id, player.passcode)}
